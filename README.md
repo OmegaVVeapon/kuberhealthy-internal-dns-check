@@ -1,0 +1,1 @@
+# kuberhealthy-internal-dns-check
