@@ -6,8 +6,8 @@ from kubernetes.client.rest import ApiException
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# config.load_incluster_config()
-config.load_kube_config()
+config.load_incluster_config()
+#  config.load_kube_config()
 
 v1 = client.CoreV1Api()
 

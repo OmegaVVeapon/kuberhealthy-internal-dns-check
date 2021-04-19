@@ -7,7 +7,7 @@ from nslookup import Nslookup
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_dns_endpoint_ips(namespace, dns_node_selector):
+def get_dns_svc(namespace, dns_node_selector):
     logger.info("Looking for DNS service with label: '%s'", dns_node_selector)
 
     dns_svc = get_namespaced_service(namespace, dns_node_selector)
@@ -16,15 +16,13 @@ def get_dns_endpoint_ips(namespace, dns_node_selector):
         logger.error("Could not find DNS service")
         sys.exit(1)
 
-    DNS_SVC_NAME = dns_svc.items[0].metadata.name
+    return dns_svc.items[0]
 
-    logger.info("Successfully found %s DNS service with IP %s",
-            DNS_SVC_NAME,
-            dns_svc.items[0].spec.cluster_ip)
+def get_dns_endpoint_ips(namespace, dns_svc_name):
 
-    logger.info("Getting the endpoint IPs for DNS service: '%s'", DNS_SVC_NAME)
+    logger.info("Getting the endpoint IPs for DNS service: '%s'", dns_svc_name)
 
-    dns_eps = get_namespaced_endpoints(namespace, 'metadata.name=kube-dns')
+    dns_eps = get_namespaced_endpoints(namespace, f"metadata.name={dns_svc_name}")
 
     dns_eps_ips = []
     for subset in dns_eps.items[0].subsets:
