@@ -1,10 +1,8 @@
 import os
-import sys
 import logging
-from kh_client import *
 from dns_helpers import *
 from headless import get_headless_endpoint_ips
-from pprint import pprint
+from kh_status import kh_fail, kh_success
 
 # TODO: Make log level configurable from env var
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', level=logging.INFO)
@@ -12,9 +10,8 @@ logger = logging.getLogger(__name__)
 
 try:
     HOSTNAME = os.environ['HOSTNAME']
-except KeyError as e:
-    logger.error("HOSTNAME environment variable is required!")
-    sys.exit(1)
+except KeyError:
+    kh_fail("HOSTNAME environment variable is required!")
 
 logger.info("HOSTNAME env var provided as: '%s'", HOSTNAME)
 
@@ -45,28 +42,26 @@ if None not in (NAMESPACE, DNS_NODE_SELECTOR):
     logger.info("Found DNS endpoint IPs: %s", dns_eps_ips)
     logger.info("Found DNS pod IPs: %s", dns_pod_ips)
 
-    if not dns_eps_ips or not dns_pod_ips:
-        logger.error("Both the DNS endpoints and pod ips should have been found!")
-        sys.exit(1)
-
     if set(dns_eps_ips).difference(dns_pod_ips):
-        logger.error("DNS service has mismatching endpoints and pod IPs!")
-        sys.exit(1)
+        kh_fail("DNS service has mismatching endpoints and pod IPs!")
     else:
         logger.info("Successfully matched DNS endpoint and pod IPs.")
 else:
     logger.info("NAMESPACE is '%s' and DNS_NODE_SELECTOR is '%s'. They both need to be provided for DNS endpoint checks. Skipping", NAMESPACE, DNS_NODE_SELECTOR)
+    dns_svc_name = dns_svc_ip = dns_eps_ips = dns_pod_ips = None
 
 # Verify that the Kubernetes master Service works. If it doesn't, then there's
 # no need to check anything else, we have bigger problems.
 # https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/#does-any-service-exist-in-dns
 
 logger.info("Attempting to resolve the kubernetes master service")
-ips_record = get_ips_record("kubernetes.default", [dns_svc_ip])
 
-if not ips_record.answer:
-    logger.error("Could not resolve master service: kubernetes.default")
-    #  exit(1)
+# If we got the information to find the DNS service's IP use it explicitely as the nameserver
+# Otherwise, let the default nameserver be used
+if dns_svc_ip:
+    ips_record = get_ips_record("kubernetes.default", [dns_svc_ip])
+else:
+    ips_record = get_ips_record("kubernetes.default")
 
 logger.info("Service: 'kubernetes.default' resolved successfully")
 
@@ -77,7 +72,7 @@ hostname_list = HOSTNAME.split('.')
 if len(hostname_list) > 1:
     hostname = hostname_list[0]
     hostname_namespace = hostname_list[1]
-    logger.info("HOSTNAME: '%s' seems to be qualified. Assuming namespace: '%s'", HOSTNAME, hostname_namespace)
+    logger.info("HOSTNAME: '%s' seems to be qualified. Inferring namespace: '%s'", HOSTNAME, hostname_namespace)
 else:
     hostname = HOSTNAME
     hostname_namespace = 'default'
@@ -88,11 +83,12 @@ logger.info("Looking for HOSTNAME: '%s' in namespace: '%s'", hostname, hostname_
 hostname_svc = get_namespaced_service(hostname_namespace, field=f"metadata.name={hostname}")
 
 if not hostname_svc.items:
-    logger.error("Could not find '%s'. Check that it exists in the '%s' namespace.", hostname, hostname_namespace)
-    sys.exit(1)
+    kh_fail(f"Could not find service '{hostname}'. Check that it exists in the '{hostname_namespace}' namespace")
 
 hostname_svc_ip = hostname_svc.items[0].spec.cluster_ip
-logger.info("Found '%s' with IP: '%s'", HOSTNAME, hostname_svc_ip)
+logger.info("Found service '%s' with ClusterIP: '%s'", HOSTNAME, hostname_svc_ip)
+
+#TODO: I feel like this could be refactored to be made simpler... need to come back to this later
 
 # If we were able to obtain the nameserver IPs, verify they are working correctly
 if dns_eps_ips:
@@ -110,24 +106,20 @@ if dns_eps_ips:
         ips_record_answer = sorted(ips_record.answer)
         logger.info("Nameserver '%s' resolved hostname to %s", nameserver, ips_record_answer)
         if set(ips_record_answer).difference(comparison_ips):
-            logger.error("Nameserver: '%s' resolved IP '%s' when the expected IP was '%s'", nameserver, ips_record_answer, comparison_ips)
-            sys.exit(1)
+            kh_fail(f"Nameserver: '{nameserver}' resolved IP '{ips_record_answer}' when the expected IP was '{comparison_ips}'")
     logger.info("All nameservers resolved '%s' correctly!", HOSTNAME)
+else:
+    # If we didn't have the info to find the DNS servers and we were provided a non-headless service, at least try to resolve it with the default nameserver
+    # There's nothing we can do about non-headless services...
+    if hostname_svc_ip != 'None':
+        ips_record = get_ips_record(HOSTNAME)
 
-#  fail = os.getenv("FAIL", None)
+        ips_record_answer = sorted(ips_record.answer)
+        comparison_ip = [hostname_svc_ip]
 
-#  if fail:
-#      print("Reporting failure.")
-#      try:
-#          report_failure(["example failure message"])
-#      except Exception as e:
-#          print(f"Error when reporting failure: {e}")
-#          exit(1)
-#  else:
-#      print("Reporting success.")
-#      try:
-#          report_success()
-#      except Exception as e:
-#          print(f"Error when reporting success: {e}")
-#          exit(1)
-#  exit(0)
+        if set(ips_record_answer).difference(comparison_ip):
+            kh_fail(f"Default nameserver resolved IP '{ips_record_answer}' when the expected IP was '{comparison_ip}'")
+        else:
+            logger.info("Default nameserver resolved '%s' to %s which is correct!", HOSTNAME, ips_record_answer)
+
+kh_success()

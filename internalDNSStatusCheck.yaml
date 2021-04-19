@@ -4,18 +4,20 @@ metadata:
   name: dns-status-internal
   namespace: kuberhealthy
 spec:
-  runInterval: 2m
-  timeout: 15m
+  runInterval: 1m
+  timeout: 2m
   podSpec:
     serviceAccountName: dns-internal-check
     containers:
       - env:
           - name: HOSTNAME
-            value: "hostnames.default.svc.cluster.local"
+            # value: "hostnames-headless.default"
+            # value: "hostnames.default"
+            value: "idontexist"
           - name: NAMESPACE
             value: "kube-system"
           - name: DNS_NODE_SELECTOR
-            value: apps=k8s-dns
+            value: k8s-app=kube-dns
           - name: NODE_NAME
             valueFrom:
               fieldRef:
