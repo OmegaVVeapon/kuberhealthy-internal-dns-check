@@ -1,19 +1,17 @@
 apiVersion: comcast.github.io/v1
 kind: KuberhealthyCheck
 metadata:
-  name: dns-status-internal
+  name: headless-dns-status-internal
   namespace: kuberhealthy
 spec:
-  runInterval: 1m
-  timeout: 2m
+  runInterval: 2m
+  timeout: 3m
   podSpec:
     serviceAccountName: dns-internal-check
     containers:
       - env:
-          - name: HOSTNAME
-            # value: "hostnames-headless.default"
-            # value: "hostnames.default"
-            value: "idontexist"
+          - name: ANNOTATION
+            value: "please-check"
           - name: NAMESPACE
             value: "kube-system"
           - name: DNS_NODE_SELECTOR
@@ -22,7 +20,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-        # image: kuberhealthy/dns-resolution-check:v1.4.3
         image: omegavveapon/kuberhealthy-internal-dns-check:working-check
         imagePullPolicy: Always
         name: main

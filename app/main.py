@@ -1,54 +1,70 @@
 import os
 import logging
 from dns_helpers import *
+from env_vars import get_env_var_int, get_required_env_var
+from services import get_services_with_annotation
 from headless import get_headless_endpoint_ips
 from kh_status import kh_fail, kh_success
+import sys
+from pprint import pprint
 
 # TODO: Make log level configurable from env var
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-try:
-    HOSTNAME = os.environ['HOSTNAME']
-except KeyError:
-    kh_fail("HOSTNAME environment variable is required!")
+ANNOTATION = get_required_env_var('ANNOTATION')
+DNS_NODE_SELECTOR = get_required_env_var('DNS_NODE_SELECTOR')
+DNS_NAMESPACE = get_required_env_var('DNS_NAMESPACE')
 
-logger.info("HOSTNAME env var provided as: '%s'", HOSTNAME)
+logger.info("ANNOTATION env var provided as: '%s'", ANNOTATION)
+logger.info("DNS_NODE_SELECTOR env var provided as: '%s'", DNS_NODE_SELECTOR)
+logger.info("DNS_NAMESPACE env var provided as: '%s'", DNS_NAMESPACE)
 
-DNS_NODE_SELECTOR = os.getenv('DNS_NODE_SELECTOR')
-NAMESPACE = os.getenv('NAMESPACE')
+# Get the max number of services we will check for pagination
+MAX_SERVICES = get_env_var_int('MAX_SERVICES', 30)
 
-if NAMESPACE:
-    logger.info("NAMESPACE env var provided as: '%s'", NAMESPACE)
+logger.info("Looking for services with annotation '%s'", ANNOTATION)
+_continue = None
+while True:
+    annotated_services = get_services_with_annotation(
+            annotation='please-check',
+            _continue=_continue,
+            limit=MAX_SERVICES
+            )
 
-if DNS_NODE_SELECTOR:
-    logger.info("DNS_NODE_SELECTOR env var provided as: '%s'", DNS_NODE_SELECTOR)
+    if annotated_services['services']:
+        pprint(annotated_services['services'])
 
-if None not in (NAMESPACE, DNS_NODE_SELECTOR):
-    logger.info("NAMESPACE and DNS_NODE_SELECTOR have both been provided. DNS endpoint checking is enabled.")
+    _continue = annotated_services['continue']
 
-    dns_svc = get_dns_svc(NAMESPACE, DNS_NODE_SELECTOR)
+    if not annotated_services['continue']:
+        break
 
-    dns_svc_name = dns_svc.metadata.name
-    dns_svc_ip = dns_svc.spec.cluster_ip
+    logger.debug("%s services remaining to check", annotated_services['remaining'])
 
-    logger.info("Successfully found DNS service: '%s' with IP: '%s'",
-            dns_svc_name,
-            dns_svc_ip)
+##### DNS section
 
-    dns_eps_ips = get_dns_endpoint_ips(NAMESPACE, dns_svc_name)
-    dns_pod_ips = get_dns_pod_ips(NAMESPACE, DNS_NODE_SELECTOR)
+dns_svc = get_dns_svc(DNS_NAMESPACE, DNS_NODE_SELECTOR)
 
-    logger.info("Found DNS endpoint IPs: %s", dns_eps_ips)
-    logger.info("Found DNS pod IPs: %s", dns_pod_ips)
+dns_svc_name = dns_svc.metadata.name
+dns_svc_ip = dns_svc.spec.cluster_ip
 
-    if set(dns_eps_ips).difference(dns_pod_ips):
-        kh_fail("DNS service has mismatching endpoints and pod IPs!")
-    else:
-        logger.info("Successfully matched DNS endpoint and pod IPs.")
+logger.info("Successfully found DNS service: '%s' with IP: '%s'",
+        dns_svc_name,
+        dns_svc_ip)
+
+dns_eps_ips = get_dns_endpoint_ips(DNS_NAMESPACE, dns_svc_name)
+dns_pod_ips = get_dns_pod_ips(DNS_NAMESPACE, DNS_NODE_SELECTOR)
+
+logger.info("Found DNS endpoint IPs: %s", dns_eps_ips)
+logger.info("Found DNS pod IPs: %s", dns_pod_ips)
+
+if set(dns_eps_ips).difference(dns_pod_ips):
+    kh_fail("DNS service has mismatching endpoints and pod IPs!")
 else:
-    logger.info("NAMESPACE is '%s' and DNS_NODE_SELECTOR is '%s'. They both need to be provided for DNS endpoint checks. Skipping", NAMESPACE, DNS_NODE_SELECTOR)
-    dns_svc_name = dns_svc_ip = dns_eps_ips = dns_pod_ips = None
+    logger.info("Successfully matched DNS endpoint and pod IPs.")
+
+sys.exit(0)
 
 # Verify that the Kubernetes master Service works. If it doesn't, then there's
 # no need to check anything else, we have bigger problems.

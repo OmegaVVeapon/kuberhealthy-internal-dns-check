@@ -1,7 +1,7 @@
 import sys
 import logging
 from kube_helpers import *
-from kh_status import kh_fail, kh_success
+from kh_status import kh_fail
 from nslookup import Nslookup
 
 # TODO: Make log level configurable from env var
