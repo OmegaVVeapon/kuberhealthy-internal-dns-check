@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostnames
+  annotations:
+    'please-check': 'yes'
+spec:
+  selector:
+    app: hostnames
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9376
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostnames-headless
+  annotations:
+    'please-check': 'yes'
+spec:
+  selector:
+    app: hostnames
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostnames-headless
+  namespace: test-namespace
+  annotations:
+    'please-check': 'yes'
+spec:
+  selector:
+    app: something-not-real
+  clusterIP: None
