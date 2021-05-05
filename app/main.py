@@ -55,15 +55,16 @@ else:
 logger.info("Looking for services with annotation '%s'", ANNOTATION)
 _continue = None
 
+# Search through all the services in the cluster for annotated ones
 while True:
     annotated_services = get_services_with_annotation(
-            annotation='please-check',
+            annotation=ANNOTATION,
             _continue=_continue,
             limit=MAX_SERVICES
             )
 
     if annotated_services['services']:
-        pprint(annotated_services['services'])
+        #  pprint(annotated_services['services'])
         for service in annotated_services['services']:
             resolve_service(
                 service=service['name'],

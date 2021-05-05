@@ -1,7 +1,7 @@
 apiVersion: comcast.github.io/v1
 kind: KuberhealthyCheck
 metadata:
-  name: headless-dns-status-internal
+  name: dns-internal-check
   namespace: kuberhealthy
 spec:
   runInterval: 2m
@@ -12,10 +12,12 @@ spec:
       - env:
           - name: ANNOTATION
             value: "please-check"
-          - name: NAMESPACE
+          - name: DNS_NAMESPACE
             value: "kube-system"
           - name: DNS_NODE_SELECTOR
-            value: k8s-app=kube-dns
+            value: "k8s-app=kube-dns"
+          - name: MAX_SERVICES
+            value: "1"
           - name: NODE_NAME
             valueFrom:
               fieldRef:
