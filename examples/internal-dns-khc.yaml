@@ -11,7 +11,7 @@ spec:
     containers:
       - env:
           - name: ANNOTATION
-            value: "please-check"
+            value: "please-check-me"
           - name: DNS_NAMESPACE
             value: "kube-system"
           - name: DNS_NODE_SELECTOR
