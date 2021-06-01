@@ -44,6 +44,7 @@ All tags are automatically built and pushed to [Dockerhub](https://hub.docker.co
 | ANNOTATION | <b>Yes</b> | `None` | Annotation that will need to be present in services for the check to pick them up |
 | DNS_NAMESPACE | <b>Yes</b> | `None` | Namespace where the DNS pods are located |
 | DNS_NODE_SELECTOR | <b>Yes</b> | `None` | The label belonging to the DNS pods |
+| MAX_SERVICES | No | `30` | This is the max number of services that will be returned by the k8s API per call (for pagination purposes). |
 
 ## DNS pod selection
 
@@ -52,3 +53,6 @@ If you're confused about what your `DNS_NAMESPACE` and `DNS_NODE_SELECTOR` shoul
 ```
 kubectl get pods -o wide --namespace=<DNS_NAMESPACE> -l <DNS_NODE_SELECTOR>
 ```
+
+If that returns all the DNS pods for your cluster, then you have the right values.
+
