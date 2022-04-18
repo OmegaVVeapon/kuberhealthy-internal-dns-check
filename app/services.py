@@ -16,7 +16,7 @@ def get_headless_endpoint_ips(headless_svc, namespace):
 
     if headless_svc_eps.items[0].subsets is not None:
         for subset in headless_svc_eps.items[0].subsets:
-            if subset is not None:
+            if subset is not None and subset.addresses is not None:
                 for address in subset.addresses:
                     headless_eps_ips.append(address.ip)
 
